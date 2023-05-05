@@ -34,6 +34,8 @@ def main():
     print("main")
     l = get_all_stargazers()
     print(l)
+    for u in l:
+        print u
 
 if __name__ == "__main__":
     main()
