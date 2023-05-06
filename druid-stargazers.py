@@ -3,51 +3,69 @@ import json
 import os
 import re
 
-repo_url = "https://api.github.com/repos/apache/druid-website-src/stargazers"
-# url = "https://api.github.com/repos/apache/druid/stargazers"
-token = os.environ['GITHUB_TOKEN']
-headers = {
-    "Accept": "application/vnd.github.star+json",
-    "Authorization": "Bearer " + token,
-    "X-GitHub-Api-Version": "2022-11-28"
-}
+TOKEN = os.environ['GITHUB_TOKEN']
+OWNER = "apache"
+REPO = "druid-website-src"
+# REPO = "druid"
 
 def get_all_starred(user_record):
+
     url = user_record["user"]["starred_url"]
     url = re.sub(r'\{/[^\}]+\}', '', url)
-    print(url)    
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": "Bearer " + TOKEN,
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    params = { "per_page": 100, "page": 1 }
+    starred = []
+    # print(f'-------- Getting stars for {url}')
+
+    while True:
+        r = requests.get(url, headers=headers, params=params)
+        partList = r.json()
+        elements = len(partList)
+        # print(f'-------- Page {params}: Got {elements} elements')
+        if elements == 0:
+            break
+        starred += partList
+        params['page'] += 1
+    starred_repos = [ x['full_name'] for x in starred ]
+    # print(json.dumps(starred_repos))
+    return starred_repos
+
 
 def get_all_stargazers(owner, repo):
 
     url = "https://api.github.com/repos/" + owner + "/" + repo + "/stargazers"
-    params = { "per_page": 10, "page": 1 }
+    headers = {
+        "Accept": "application/vnd.github.star+json",
+        "Authorization": "Bearer " + TOKEN,
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    params = { "per_page": 100, "page": 1 }
     gazers = []
 
     while True:
         r = requests.get(url, headers=headers, params=params)
         partList = r.json()
-        # print(partList)
         elements = len(partList)
-        # print(params)
-        # print(f'#elements: {elements}')
         if elements == 0:
             break
         gazers += partList
         params['page'] += 1
     return gazers
 
+
 def main():
 
-    # print("main")
-    owner = "apache"
-    repo = "druid-website-src"
-    l = get_all_stargazers(owner, repo)
+    l = get_all_stargazers(OWNER, REPO)
     # print(l)
     for u in l:
         u["starred_repo"] = owner + "/" + repo
+        u["other_starred_repos"] = get_all_starred(u)
         print(json.dumps(u))
-    for u in l:
-        get_all_starred(u)
+
 
 if __name__ == "__main__":
     main()
