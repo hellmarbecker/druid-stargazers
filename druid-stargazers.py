@@ -86,10 +86,11 @@ def get_paginated_list(url, headers):
                 gotit = True
                 break
             elif code == 404:
-                logging.info(f'-------- URL {url} Page {params["page"]}: error, no retry')
+                logging.info(f'-------- URL {url} Page {params["page"]}: error 404, no retry')
                 gotit = False
                 break
             else:
+                logging.info(f'-------- URL {url} Page {params["page"]}: response {r.text}')
                 if backoff < 3600:
                     logging.info(f'-------- URL {url} Page {params["page"]}: sleeping {backoff} before retry')
                     time.sleep(backoff)
