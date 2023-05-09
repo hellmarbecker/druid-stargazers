@@ -10,9 +10,9 @@ from threading import Thread
 
 TOKEN = os.environ['GITHUB_TOKEN']
 OWNER = "apache"
-# REPO = "druid-website-src"
+#REPO = "druid-website-src"
 REPO = "druid"
-PAGESIZE = 50
+PAGESIZE = 100
 RESULTS = {}
 
 # Thread code from https://blog.jonlu.ca/posts/async-python-http
@@ -22,21 +22,27 @@ class Worker(Thread):
 
     def __init__(self, tasks):
         Thread.__init__(self)
+        logging.debug('==== in Worker.__init__')
         self.tasks = tasks
         self.daemon = True
         self.start()
 
     def run(self):
+        logging.debug('==== in Worker.run')
         while True:
+            logging.debug('==== in Worker.run before get')
             func, args, kargs = self.tasks.get()
-        try:
-            func(*args, **kargs)
-        except Exception as e:
-            # An exception happened in this thread
-            print(e)
-        finally:
-            # Mark this task as done, whether an exception happened or not
-            self.tasks.task_done()
+            logging.debug(f'==== in Worker.run after get: {func} {args}')
+            try:
+                logging.debug('==== in Worker.run before call')
+                func(*args, **kargs)
+                logging.debug('==== in Worker.run before call')
+            except Exception as e:
+                # An exception happened in this thread
+                print(e)
+            finally:
+                # Mark this task as done, whether an exception happened or not
+                self.tasks.task_done()
 
 
 class ThreadPool:
@@ -54,6 +60,7 @@ class ThreadPool:
     def map(self, func, args_list):
         """ Add a list of tasks to the queue """
         for args in args_list:
+            logging.debug(f'adding task for {args}')
             self.add_task(func, args)
 
     def wait_completion(self):
@@ -73,7 +80,7 @@ def get_paginated_list(url, headers):
         while True:
             r = requests.get(url, headers=headers, params=params)
             code = r.status_code
-            logging.info(f'-------- URL {url} Page {params["page"]} (of {params["per_page"]}): return code {code}')
+            logging.info(f'-------- URL {url} Page {params["page"]} ({params["per_page"]} per page): return code {code}')
             if code == 200:
                 logging.info(f'-------- URL {url} Page {params["page"]}: OK')
                 gotit = True
@@ -116,10 +123,12 @@ def get_all_starred(u):
     }
     starred = get_paginated_list(url, headers)
     starred_repos = [ repo_entry['full_name'] for sublist in starred for repo_entry in sublist ]
-    print(json.dumps(starred_repos))
+    logging.debug(f'{username} stars: {json.dumps(starred_repos)}')
+    # print(json.dumps(starred_repos))
     RESULTS[username] = u
     RESULTS[username]["starred_repo"] = OWNER + "/" + REPO
     RESULTS[username]["other_starred_repos"] = starred_repos
+    # print(json.dumps(RESULTS[username]))
 
 
 def get_all_stargazers(owner, repo):
@@ -146,17 +155,16 @@ def main():
     for p in ll:
 
         threads = len(p)
+        logging.info(f'running {threads} threads')
         pool = ThreadPool(threads)
 
+        logging.info(f'before map')
         pool.map(get_all_starred, p)
+        logging.info(f'after map')
         pool.wait_completion()
 
-    for u in l:
-        u["starred_repo"] = OWNER + "/" + REPO
-        logging.info(f'Getting stars for user {u["user"]["login"]}')
-        u["other_starred_repos"] = get_all_starred(u["user"]["starred_url"])
-        # print(json.dumps(u))
-
+    for k, v in RESULTS.items():
+        print(v)
 
 if __name__ == "__main__":
     main()
