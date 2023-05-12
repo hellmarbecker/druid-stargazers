@@ -22,21 +22,21 @@ class Worker(Thread):
 
     def __init__(self, tasks):
         Thread.__init__(self)
-        logging.debug('==== in Worker.__init__')
+        logging.debug(f'==== {self.name} in Worker.__init__')
         self.tasks = tasks
         self.daemon = True
         self.start()
 
     def run(self):
-        logging.debug('==== in Worker.run')
+        logging.debug(f'==== {self.name} in Worker.run')
         while True:
-            logging.debug('==== in Worker.run before get')
+            logging.debug(f'==== {self.name} in Worker.run before get')
             func, args, kargs = self.tasks.get()
-            logging.debug(f'==== in Worker.run after get: {func} {args}')
+            logging.debug(f'==== {self.name} in Worker.run after get: {func} {args}')
             try:
-                logging.debug('==== in Worker.run before call')
+                logging.debug(f'==== {self.name} in Worker.run before call')
                 func(*args, **kargs)
-                logging.debug('==== in Worker.run before call')
+                logging.debug(f'==== {self.name} in Worker.run before call')
             except Exception as e:
                 # An exception happened in this thread
                 print(e)
@@ -153,16 +153,16 @@ def main():
     logging.info(f'Getting users for repo {OWNER}/{REPO}')
     ll = get_all_stargazers(OWNER, REPO)
 
-    for p in ll:
+    logging.info(f'running {PAGESIZE} threads')
+    pool = ThreadPool(PAGESIZE)
 
-        threads = len(p)
-        logging.info(f'running {threads} threads')
-        pool = ThreadPool(threads)
+    for p in ll:
 
         logging.info(f'before map')
         pool.map(get_all_starred, p)
         logging.info(f'after map')
-        pool.wait_completion()
+
+    pool.wait_completion()
 
     for k, v in RESULTS.items():
         print(v)
