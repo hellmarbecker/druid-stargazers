@@ -4,14 +4,15 @@ import os
 import re
 import logging
 import time
+import sys
 from queue import Queue
 from threading import Thread
 
 
 TOKEN = os.environ['GITHUB_TOKEN']
 OWNER = "apache"
-#REPO = "druid-website-src"
-REPO = "druid"
+REPO = "druid-website-src"
+#REPO = "druid"
 PAGESIZE = 100
 RESULTS = {}
 
@@ -132,6 +133,47 @@ def get_all_starred(u):
     # print(json.dumps(RESULTS[username]))
 
 
+def get_gazers_detail(u):
+
+    global RESULTS
+    username = u["user"]["login"]
+    logging.info(f'---- in get_gazers_detail({username})')
+
+    url = "https://api.github.com/users/" + username
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": "Bearer " + TOKEN,
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+ 
+    backoff = 10
+    gotit = False
+    while True:
+        r = requests.get(url, headers=headers)
+        code = r.status_code
+        logging.info(f'-------- URL {url}: return code {code}')
+        if code == 200:
+            logging.info(f'-------- URL {url}: OK')
+            gotit = True
+            break
+        elif code == 404:
+            logging.info(f'-------- URL {url}: error 404, no retry')
+            gotit = False
+            break
+        else:
+            logging.info(f'-------- URL {url}: response {r.text}')
+            if backoff < 3600:
+                logging.info(f'-------- URL {url}: sleeping {backoff} before retry')
+                time.sleep(backoff)
+                backoff *= 2
+            else:
+                logging.info(f'-------- URL {url}: backoff = {backoff}, giving up')
+                break
+    if gotit:
+        RESULTS[username] = r.json()
+        print(json.dumps(r.json()))
+
+
 def get_all_stargazers(owner, repo):
 
     url = "https://api.github.com/repos/" + owner + "/" + repo + "/stargazers"
@@ -152,6 +194,10 @@ def main():
 
     logging.info(f'Getting users for repo {OWNER}/{REPO}')
     ll = get_all_stargazers(OWNER, REPO)
+    # gazers_flat = [ x for sublist in ll for x in sublist ]
+    # for i in gazers_flat:
+    #     print(json.dumps(i))
+    # sys.exit(0)
 
     logging.info(f'running {PAGESIZE} threads')
     pool = ThreadPool(PAGESIZE)
@@ -159,13 +205,14 @@ def main():
     for p in ll:
 
         logging.info(f'before map')
-        pool.map(get_all_starred, p)
+        # pool.map(get_all_starred, p)
+        pool.map(get_gazers_detail, p)
         logging.info(f'after map')
 
     pool.wait_completion()
 
-    for k, v in RESULTS.items():
-        print(v)
+    # for k, v in RESULTS.items():
+    #    print(v)
 
 if __name__ == "__main__":
     main()
