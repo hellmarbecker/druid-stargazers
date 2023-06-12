@@ -69,6 +69,47 @@ class ThreadPool:
         self.tasks.join()
 
 
+def get_one(url, headers, params):
+
+    backoff = 10
+    gotit = False
+    while True:
+        r = requests.get(url, headers=headers)
+        code = r.status_code
+        logging.info(f'-------- URL {url}: return code {code}')
+        if code == 200:
+            logging.info(f'-------- URL {url}: OK')
+            gotit = True
+            break
+        elif code == 404:
+            logging.info(f'-------- URL {url}: error 404, no retry')
+            gotit = False
+            break
+        elif code == 403:
+            logging.info(f'-------- URL {url}: error 403, possible hitting rate limit')
+            logging.info(f'-------- URL {url}: response {r.text}')
+
+            if r.headers['retry-after'] is not None:
+                sleepSeconds = r.headers['retry-after']
+                logging.info(f'-------- URL {url}: secondary limit hit, waiting {sleepSeconds}')
+                # wait so many seconds
+            elif r.headers['x-ratelimit-remaining'] == 0:
+                timeRetry = r.headers['x-ratelimit-reset']
+                logging.info(f'-------- URL {url}: limit hit, waiting until {timeRetry}')
+                # wait until time  
+            elif backoff < 3600:
+                # exponential backoff
+                logging.info(f'-------- URL {url}: sleeping {backoff} before retry')
+                time.sleep(backoff)
+                backoff *= 2
+            else:
+                logging.info(f'-------- URL {url}: backoff = {backoff}, giving up')
+                break
+        else:
+           logging.info(f'-------- URL {url}: error {code}, no retry')
+    return r, gotit
+
+
 def get_paginated_list(url, headers):
 
     params = { "per_page": PAGESIZE, "page": 1 }
