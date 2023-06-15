@@ -13,7 +13,14 @@ TOKEN = os.environ['GITHUB_TOKEN']
 #OWNER = "apache"
 #REPO = "druid-website-src"
 #REPO = "druid"
-REPOS = [ "apache/druid", "apache/pinot", "ClickHouse/ClickHouse", "apache/superset", "apache/kafka", "apache/pulsar", "apache/flink" ]
+REPOS = [
+    "apache/druid",
+    "apache/pinot",
+    "ClickHouse/ClickHouse"
+]
+# TODO add superset etc.
+# also it seems that after 400 requests against the stargazers endpoint for one repo, you get a 422 error for endpoint spammed
+# and superset has more than 50k stars
 PAGESIZE = 100
 RESULTS = {}
 
@@ -41,7 +48,7 @@ class Worker(Thread):
                 logging.debug(f'==== {self.name} in Worker.run before call')
             except Exception as e:
                 # An exception happened in this thread
-                print(e)
+                logging.error(e)
             finally:
                 # Mark this task as done, whether an exception happened or not
                 self.tasks.task_done()
@@ -129,9 +136,11 @@ def get_paginated_list(url, headers):
             partList = r.json()
             elements = len(partList)
             logging.info(f'-------- URL {url} Page {params["page"]}: Got {elements} elements')
+            logging.debug(f'part list: {partList}')
             if elements == 0:
                 break
-            resultList.append(partList)
+            resultList += partList
+            logging.debug(f'result list: {resultList}')
         params['page'] += 1
     return resultList
 
@@ -189,6 +198,7 @@ def get_all_stargazers(owner, repo):
         "X-GitHub-Api-Version": "2022-11-28"
     }
     gazers = get_paginated_list(url, headers)
+    logging.debug(f'gazers: {gazers}')
     for g in gazers:
         g["starred_repo"] = owner + "/" + repo
     return gazers
@@ -205,7 +215,7 @@ def main():
         logging.info(f'Getting users for repo {repo}')
         owner_repo = repo.split('/')
         l = get_all_stargazers(*owner_repo)
-        ll.append(l)
+        ll += l
 
     get_detail = False
     if get_detail:
