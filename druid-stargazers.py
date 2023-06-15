@@ -204,7 +204,8 @@ def main():
     for repo in REPOS:
         logging.info(f'Getting users for repo {repo}')
         owner_repo = repo.split('/')
-        ll.append(get_all_stargazers(*owner_repo))
+        l = ll.append(get_all_stargazers(*owner_repo))
+        ll.append(l)
 
     get_detail = False
     if get_detail:
