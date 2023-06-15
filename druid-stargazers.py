@@ -11,8 +11,8 @@ from threading import Thread
 
 TOKEN = os.environ['GITHUB_TOKEN']
 OWNER = "apache"
-REPO = "druid-website-src"
-#REPO = "druid"
+#REPO = "druid-website-src"
+REPO = "druid"
 PAGESIZE = 100
 RESULTS = {}
 
@@ -69,12 +69,13 @@ class ThreadPool:
         self.tasks.join()
 
 
-def get_one(url, headers, params):
+def get_one(url, **kw):
 
     backoff = 10
+    sleepSeconds = -1
     gotit = False
     while True:
-        r = requests.get(url, headers=headers)
+        r = requests.get(url, **kw)
         code = r.status_code
         logging.info(f'-------- URL {url}: return code {code}')
         if code == 200:
@@ -86,25 +87,29 @@ def get_one(url, headers, params):
             gotit = False
             break
         elif code == 403:
-            logging.info(f'-------- URL {url}: error 403, possible hitting rate limit')
+            logging.info(f'-------- URL {url}: error 403, possibly hitting rate limit')
             logging.info(f'-------- URL {url}: response {r.text}')
+            logging.info(f'-------- URL {url}: response headers {r.headers}')
 
-            if r.headers['retry-after'] is not None:
-                sleepSeconds = r.headers['retry-after']
-                logging.info(f'-------- URL {url}: secondary limit hit, waiting {sleepSeconds}')
+            if 'Retry-After' in r.headers:
+                sleepSeconds = r.headers['Retry-After']
+                logging.info(f'-------- URL {url}: secondary rate limit hit, waiting {sleepSeconds}')
                 # wait so many seconds
-            elif r.headers['x-ratelimit-remaining'] == 0:
-                timeRetry = r.headers['x-ratelimit-reset']
-                logging.info(f'-------- URL {url}: limit hit, waiting until {timeRetry}')
+            elif 'X-RateLimit-Remaining' in r.headers and r.headers['X-RateLimit-Remaining'] == '0':
+                timeRetry = r.headers['X-RateLimit-Reset']
+                sleepSeconds = int(timeRetry) - time.time()
+                logging.info(f'-------- URL {url}: global rate limit hit, waiting until {timeRetry}')
                 # wait until time  
             elif backoff < 3600:
                 # exponential backoff
-                logging.info(f'-------- URL {url}: sleeping {backoff} before retry')
-                time.sleep(backoff)
+                logging.info(f'-------- URL {url}: exponential backoff {backoff} before retry')
+                sleepSeconds = backoff
                 backoff *= 2
             else:
                 logging.info(f'-------- URL {url}: backoff = {backoff}, giving up')
                 break
+            logging.info(f'-------- URL {url}: sleeping {sleepSeconds} before retry')
+            time.sleep(sleepSeconds)
         else:
            logging.info(f'-------- URL {url}: error {code}, no retry')
     return r, gotit
@@ -117,29 +122,7 @@ def get_paginated_list(url, headers):
     # print(f'-------- Getting paginated result for {url}')
 
     while True:
-        backoff = 10
-        gotit = False
-        while True:
-            r = requests.get(url, headers=headers, params=params)
-            code = r.status_code
-            logging.info(f'-------- URL {url} Page {params["page"]} ({params["per_page"]} per page): return code {code}')
-            if code == 200:
-                logging.info(f'-------- URL {url} Page {params["page"]}: OK')
-                gotit = True
-                break
-            elif code == 404:
-                logging.info(f'-------- URL {url} Page {params["page"]}: error 404, no retry')
-                gotit = False
-                break
-            else:
-                logging.info(f'-------- URL {url} Page {params["page"]}: response {r.text}')
-                if backoff < 3600:
-                    logging.info(f'-------- URL {url} Page {params["page"]}: sleeping {backoff} before retry')
-                    time.sleep(backoff)
-                    backoff *= 2
-                else:
-                    logging.info(f'-------- URL {url} Page {params["page"]}: backoff = {backoff}, giving up')
-                    break
+        r, gotit = get_one(url, headers=headers, params=params)
         if gotit:
             partList = r.json()
             elements = len(partList)
@@ -187,29 +170,7 @@ def get_gazers_detail(u):
         "X-GitHub-Api-Version": "2022-11-28"
     }
  
-    backoff = 10
-    gotit = False
-    while True:
-        r = requests.get(url, headers=headers)
-        code = r.status_code
-        logging.info(f'-------- URL {url}: return code {code}')
-        if code == 200:
-            logging.info(f'-------- URL {url}: OK')
-            gotit = True
-            break
-        elif code == 404:
-            logging.info(f'-------- URL {url}: error 404, no retry')
-            gotit = False
-            break
-        else:
-            logging.info(f'-------- URL {url}: response {r.text}')
-            if backoff < 3600:
-                logging.info(f'-------- URL {url}: sleeping {backoff} before retry')
-                time.sleep(backoff)
-                backoff *= 2
-            else:
-                logging.info(f'-------- URL {url}: backoff = {backoff}, giving up')
-                break
+    r, gotit = get_one(url, headers=headers)
     if gotit:
         RESULTS[username] = r.json()
         print(json.dumps(r.json()))
