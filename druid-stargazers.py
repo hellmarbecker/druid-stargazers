@@ -206,6 +206,7 @@ def main():
         owner_repo = repo.split('/')
         ll.append(get_all_stargazers(*owner_repo))
 
+    get_detail = False
     if get_detail:
         logging.info(f'running {PAGESIZE} threads')
         pool = ThreadPool(PAGESIZE)
