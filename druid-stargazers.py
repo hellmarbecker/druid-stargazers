@@ -10,9 +10,10 @@ from threading import Thread
 
 
 TOKEN = os.environ['GITHUB_TOKEN']
-OWNER = "apache"
+#OWNER = "apache"
 #REPO = "druid-website-src"
-REPO = "druid"
+#REPO = "druid"
+REPOS = [ "apache/druid", "apache/pinot", "ClickHouse/ClickHouse", "apache/superset", "apache/kafka", "apache/pulsar", "apache/flink" ]
 PAGESIZE = 100
 RESULTS = {}
 
@@ -70,6 +71,7 @@ class ThreadPool:
 
 
 def get_one(url, **kw):
+    """ Perform one GitHub API call. If this fails because of a rate limit, retry according to https://docs.github.com/en/rest/overview/resources-in-the-rest-api?apiVersion=2022-11-28#staying-within-the-rate-limit """
 
     backoff = 10
     sleepSeconds = -1
@@ -135,6 +137,7 @@ def get_paginated_list(url, headers):
 
 
 def get_all_starred(u):
+    """ Get all repos that have been starred by user u """
 
     global RESULTS
     st_url = u["user"]["starred_url"]
@@ -158,6 +161,7 @@ def get_all_starred(u):
 
 
 def get_gazers_detail(u):
+    """ Get the profile of user u, including contct data """
 
     global RESULTS
     username = u["user"]["login"]
@@ -185,6 +189,8 @@ def get_all_stargazers(owner, repo):
         "X-GitHub-Api-Version": "2022-11-28"
     }
     gazers = get_paginated_list(url, headers)
+    for g in gazers:
+        g["starred_repo"] = owner + "/" + repo
     return gazers
 
 
@@ -194,27 +200,27 @@ def main():
     logLevel = logging.INFO
     logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logLevel)
 
-    logging.info(f'Getting users for repo {OWNER}/{REPO}')
-    ll = get_all_stargazers(OWNER, REPO)
-    # gazers_flat = [ x for sublist in ll for x in sublist ]
-    # for i in gazers_flat:
-    #     print(json.dumps(i))
-    # sys.exit(0)
+    ll = []
+    for repo in REPOS:
+        logging.info(f'Getting users for repo {repo}')
+        owner_repo = repo.split('/')
+        ll.append(get_all_stargazers(*owner_repo))
 
-    logging.info(f'running {PAGESIZE} threads')
-    pool = ThreadPool(PAGESIZE)
+    if get_detail:
+        logging.info(f'running {PAGESIZE} threads')
+        pool = ThreadPool(PAGESIZE)
 
-    for p in ll:
+        for p in ll:
 
-        logging.info(f'before map')
-        # pool.map(get_all_starred, p)
-        pool.map(get_gazers_detail, p)
-        logging.info(f'after map')
+            logging.info(f'before map')
+            # pool.map(get_all_starred, p)
+            pool.map(get_gazers_detail, p)
+            logging.info(f'after map')
 
-    pool.wait_completion()
-
-    # for k, v in RESULTS.items():
-    #    print(v)
+        pool.wait_completion()
+    else:
+        for u in ll:
+            print(json.dumps(u))
 
 if __name__ == "__main__":
     main()
