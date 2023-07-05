@@ -16,7 +16,12 @@ TOKEN = os.environ['GITHUB_TOKEN']
 REPOS = [
     "apache/druid",
     "apache/pinot",
-    "ClickHouse/ClickHouse"
+    "ClickHouse/ClickHouse",
+    "apache/doris",
+    "apache/kafka",
+    "apache/flink",
+    "apache/spark",
+    "confluentinc/ksql"
 ]
 # TODO add superset etc.
 # also it seems that after 400 requests against the stargazers endpoint for one repo, you get a 422 error for endpoint spammed
@@ -82,23 +87,21 @@ def get_one(url, **kw):
 
     backoff = 10
     sleepSeconds = -1
-    gotit = False
+    code = -1
     while True:
         r = requests.get(url, **kw)
         code = r.status_code
         logging.info(f'-------- URL {url}: return code {code}')
+        logging.debug(f'-------- URL {url}: response {r.text}')
+        logging.info(f'-------- URL {url}: response headers {r.headers}')
         if code == 200:
             logging.info(f'-------- URL {url}: OK')
-            gotit = True
             break
-        elif code == 404:
-            logging.info(f'-------- URL {url}: error 404, no retry')
-            gotit = False
+        elif code == 404 or code == 422:
+            logging.info(f'-------- URL {url}: error {code}, no retry')
             break
         elif code == 403:
-            logging.info(f'-------- URL {url}: error 403, possibly hitting rate limit')
-            logging.info(f'-------- URL {url}: response {r.text}')
-            logging.info(f'-------- URL {url}: response headers {r.headers}')
+            logging.info(f'-------- URL {url}: error {code}, possibly hitting rate limit')
 
             if 'Retry-After' in r.headers:
                 sleepSeconds = r.headers['Retry-After']
@@ -121,7 +124,7 @@ def get_one(url, **kw):
             time.sleep(sleepSeconds)
         else:
            logging.info(f'-------- URL {url}: error {code}, no retry')
-    return r, gotit
+    return r, code # return success code of last call
 
 
 def get_paginated_list(url, headers):
@@ -131,8 +134,8 @@ def get_paginated_list(url, headers):
     # print(f'-------- Getting paginated result for {url}')
 
     while True:
-        r, gotit = get_one(url, headers=headers, params=params)
-        if gotit:
+        r, lastcode = get_one(url, headers=headers, params=params)
+        if lastcode == 200:
             partList = r.json()
             elements = len(partList)
             logging.info(f'-------- URL {url} Page {params["page"]}: Got {elements} elements')
@@ -141,6 +144,8 @@ def get_paginated_list(url, headers):
                 break
             resultList += partList
             logging.debug(f'result list: {resultList}')
+        elif lastcode == 422: # hit pagination limit, https://docs.github.com/en/rest/guides/using-pagination-in-the-rest-api?apiVersion=2022-11-28#about-pagination
+            break
         params['page'] += 1
     return resultList
 
