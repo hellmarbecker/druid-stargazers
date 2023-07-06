@@ -1,0 +1,15 @@
+repos:
+  - apache/druid
+  - apache/pinot
+  - ClickHouse/ClickHouse
+  - apache/doris
+  - StarRocks/starrocks
+  - apache/kafka
+  - apache/pulsar
+  - redpanda-data/redpanda
+  - apache/flink
+  - apache/spark
+  - confluentinc/ksql
+  - allegro/turnilo
+  - apache/superset
+

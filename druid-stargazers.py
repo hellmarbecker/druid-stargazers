@@ -5,30 +5,14 @@ import re
 import logging
 import time
 import sys
+import argparse
+import yaml
 from queue import Queue
 from threading import Thread
 
 
 TOKEN = os.environ['GITHUB_TOKEN']
 
-REPOS = [
-#   RTOLAP
-    "apache/druid",
-    "apache/pinot",
-    "ClickHouse/ClickHouse",
-    "apache/doris",
-    "StarRocks/starrocks",
-#   Streaming platforms
-    "apache/kafka",
-    "apache/pulsar",
-    "redpanda-data/redpanda",
-#   Stream Processors    
-    "apache/flink",
-    "apache/spark",
-    "confluentinc/ksql",
-#   Visualization
-    "allegro/turnilo"
-]
 # TODO add superset etc.
 # also it seems that after 400 requests against the stargazers endpoint for one repo, you get a 422 error for endpoint spammed
 # and superset has more than 50k stars
@@ -214,12 +198,32 @@ def get_all_stargazers(owner, repo):
         g["starred_repo"] = owner + "/" + repo
     return gazers
 
+def readConfig(ifn): 
+    logging.debug(f'reading config file {ifn}')
+    with open(ifn, 'r') as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
+        return cfg
 
 def main():
 
     global RESULTS
+
     logLevel = logging.INFO
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--debug', help='Enable debug logging', action='store_true')
+    parser.add_argument('-q', '--quiet', help='Quiet mode (overrides Debug mode)', action='store_true')
+    parser.add_argument('-f', '--config', help='Configuration file', required=True)
+    args = parser.parse_args()
+                    
+    if args.debug:  
+        logLevel = logging.DEBUG
+    if args.quiet:  
+        logLevel = logging.ERROR 
     logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logLevel)
+
+    cfgfile = args.config
+    config = readConfig(cfgfile)
+    REPOS = config["repos"]
 
     ll = []
     for repo in REPOS:
