@@ -10,18 +10,24 @@ from threading import Thread
 
 
 TOKEN = os.environ['GITHUB_TOKEN']
-#OWNER = "apache"
-#REPO = "druid-website-src"
-#REPO = "druid"
+
 REPOS = [
+#   RTOLAP
     "apache/druid",
     "apache/pinot",
     "ClickHouse/ClickHouse",
     "apache/doris",
+    "StarRocks/starrocks",
+#   Streaming platforms
     "apache/kafka",
+    "apache/pulsar",
+    "redpanda-data/redpanda",
+#   Stream Processors    
     "apache/flink",
     "apache/spark",
-    "confluentinc/ksql"
+    "confluentinc/ksql",
+#   Visualization
+    "allegro/turnilo"
 ]
 # TODO add superset etc.
 # also it seems that after 400 requests against the stargazers endpoint for one repo, you get a 422 error for endpoint spammed
