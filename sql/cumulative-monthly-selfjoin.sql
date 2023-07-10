@@ -1,3 +1,7 @@
+-- Naive approach with a self join
+-- Truncate and aggregate by month to limit result sets
+-- This does not work when there are months that have no star for a repository
+
 WITH cte AS (
   SELECT DATE_TRUNC('MONTH', "__time") AS date_month, starred_repo, COUNT(*) AS count_monthly
   FROM "stargazers-ecosystem"
