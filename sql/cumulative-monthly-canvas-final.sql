@@ -1,3 +1,7 @@
+-- Final query.
+-- Create a canvas out of (month x repo) so we can do an inner join on repo,
+-- and do the unbound preceding window in a filtered metric.
+
 WITH 
   cte_calendar AS (
   SELECT 
