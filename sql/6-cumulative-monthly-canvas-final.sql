@@ -31,6 +31,5 @@ SELECT
   cte_stars.starred_repo,
   SUM(cte_stars.count_monthly) FILTER(WHERE cte_stars.date_month <= cte_calendar.date_month) AS sum_cume
 FROM cte_calendar INNER JOIN cte_stars ON cte_calendar.starred_repo = cte_stars.starred_repo
---WHERE cte_stars.date_month <= cte_calendar.date_month
 GROUP BY 1, 2
 ORDER BY 1, 2
